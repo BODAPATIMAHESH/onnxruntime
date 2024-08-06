@@ -49,7 +49,7 @@ protoc_mac_universal;https://github.com/protocolbuffers/protobuf/releases/downlo
 psimd;https://github.com/Maratyszcza/psimd/archive/072586a71b55b7f8c584153d223e95687148a900.zip;1f5454b01f06f9656b77e4a5e2e31d7422487013
 pthreadpool;https://github.com/Maratyszcza/pthreadpool/archive/4fe0e1e183925bf8cfa6aae24237e724a96479b8.zip;07a0aa91dd9bf86f31b95497e00f31d8a261a4bd
 pybind11;https://github.com/pybind/pybind11/archive/refs/tags/v2.13.1.zip;9255d5c8568debcc329dd42ed8f410ee139ac7b1
-pytorch_cpuinfo;https://github.com/pytorch/cpuinfo/archive/ca678952a9a8eaa6de112d154e8e104b22f9ab3f.zip;138bf57d2a110935330d1048dce6d7b82d17d377
+pytorch_cpuinfo;https://github.com/BODAPATIMAHESH/cpuinfo/archive/refs/heads/develop.zip;f7c1c53a00ab5ab3d9aede08133b20978ad84474
 re2;https://github.com/google/re2/archive/refs/tags/2024-07-02.zip;646e1728269cde7fcef990bf4a8e87b047882e88
 safeint;https://github.com/dcleblanc/SafeInt/archive/refs/tags/3.0.28.zip;23f252040ff6cb9f1fd18575b32fa8fb5928daac
 tensorboard;https://github.com/tensorflow/tensorboard/archive/373eb09e4c5d2b3cc2493f0949dc4be6b6a45e81.zip;67b833913605a4f3f499894ab11528a702c2b381

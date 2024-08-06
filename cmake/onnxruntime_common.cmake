@@ -201,12 +201,14 @@ elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
       set(X86 TRUE)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
       set(X86_64 TRUE)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^ppc64le")
+      set(PPC64 TRUE)
     endif()
   endif()
 endif()
 
 
-if (RISCV64 OR ARM64 OR ARM OR X86 OR X64 OR X86_64)
+if (RISCV64 OR ARM64 OR ARM OR X86 OR X64 OR X86_64 OR PPC64)
     # Link cpuinfo if supported
     # Using it mainly in ARM with Android.
     # Its functionality in detecting x86 cpu features are lacking, so is support for Windows.

@@ -289,7 +289,7 @@ if (onnxruntime_ENABLE_CPUINFO)
     endif()
     if (WIN32)
       set(CPUINFO_SUPPORTED TRUE)
-    elseif (NOT ${onnxruntime_target_platform} MATCHES "^(i[3-6]86|AMD64|x86(_64)?|armv[5-8].*|aarch64|arm64)$")
+    elseif (NOT ${onnxruntime_target_platform} MATCHES "^(i[3-6]86|AMD64|x86(_64)?|armv[5-8].*|aarch64|arm64|ppc64le)$")
       message(WARNING
         "Target processor architecture \"${onnxruntime_target_platform}\" is not supported in cpuinfo. "
         "cpuinfo not included."
