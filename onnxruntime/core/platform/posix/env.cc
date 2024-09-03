@@ -282,11 +282,22 @@ class PosixEnv : public Env {
     return DefaultNumCores();
   }
 
+  // PPC64: Return the smt mode
+  void SetSmtmode() const {
+      auto num_phys_cores = cpuinfo_get_cores_count();
+      auto num_logical_procs = cpuinfo_get_processors_count();
+      smt_mode = num_logical_procs/num_phys_cores;
+  }
+
   std::vector<LogicalProcessors> GetDefaultThreadAffinities() const override {
     std::vector<LogicalProcessors> ret;
 #ifdef ORT_USE_CPUINFO
     if (cpuinfo_available_) {
       auto num_phys_cores = cpuinfo_get_cores_count();
+      // PPC64: call SetSmtmode function which sets smt_mode
+#if defined(PPC64_CPUINFO_SUPPORTED)
+      SetSmtmode();
+#endif
       ret.reserve(num_phys_cores);
       for (uint32_t i = 0; i < num_phys_cores; ++i) {
         const auto* core = cpuinfo_get_core(i);

@@ -114,6 +114,7 @@ class Env {
  public:
   using EnvThread = onnxruntime::EnvThread;
   virtual ~Env() = default;
+  mutable int smt_mode = 1;
   // clang-format off
   /**
    * Start a new thread for a thread pool
@@ -145,6 +146,7 @@ class Env {
   /// <returns>Number of physical cores</returns>
   virtual int GetNumPhysicalCpuCores() const = 0;
 
+  virtual void SetSmtmode() const = 0;
   virtual std::vector<LogicalProcessors> GetDefaultThreadAffinities() const = 0;
 
   virtual int GetL2CacheSize() const = 0;
