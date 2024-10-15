@@ -113,7 +113,15 @@ CreateThreadPoolHelper(Env* env, OrtThreadPoolParams options) {
       if (default_affinities.size() <= 1) {
         return nullptr;
       }
+
+ #if defined(PPC64_CPUINFO_SUPPORTED)
+      if (Env::Default().GetSmtmode() == 8)
+	      options.thread_pool_size = (static_cast<int>(default_affinities.size())) * 4;
+      else
+	      options.thread_pool_size = (static_cast<int>(default_affinities.size())) * (Env::Default().GetSmtmode());
+#else
       options.thread_pool_size = static_cast<int>(default_affinities.size());
+#endif
       to.affinities = std::move(default_affinities);
 #endif
     } else {

@@ -282,6 +282,13 @@ class PosixEnv : public Env {
     return DefaultNumCores();
   }
 
+  int GetSmtmode() const {
+	  auto num_phys_cores = cpuinfo_get_cores_count();
+	  auto num_logical_procs = cpuinfo_get_processors_count();
+	  return num_logical_procs/num_phys_cores;
+  }
+
+
   std::vector<LogicalProcessors> GetDefaultThreadAffinities() const override {
     std::vector<LogicalProcessors> ret;
 #ifdef ORT_USE_CPUINFO
@@ -295,7 +302,15 @@ class PosixEnv : public Env {
         auto log_proc_idx = core->processor_start;
         for (uint32_t count = 0; count < core->processor_count; count++, ++log_proc_idx) {
           const auto* log_proc = cpuinfo_get_processor(log_proc_idx);
-          th_aff.push_back(log_proc->linux_id);
+#if defined(PPC64_CPUINFO_SUPPORTED)
+	if (GetSmtmode() == 8)
+		th_aff.push_back(log_proc->linux_id);
+	else
+		/* the threads are continuous from the cpuinfo, we will set them to the actual online cpu's. This will be done in other than SMT8 modes.  */
+		th_aff.push_back(log_proc->linux_id + (i * (8 - GetSmtmode())));   // 0,1 : 8,9 : 16,17 :  ... SMT2
+#else
+	th_aff.push_back(log_proc->linux_id);
+#endif
         }
         ret.push_back(std::move(th_aff));
       }
