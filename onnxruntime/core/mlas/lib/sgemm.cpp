@@ -1594,6 +1594,16 @@ MlasGemmBatch(
         TargetThreadCount = MaximumThreadCount;
     }
 
+#if defined(MLAS_TARGET_POWER)
+    if (TargetThreadCount < MaximumThreadCount) {
+	    if (Complexity < double(MLAS_SGEMM_THREAD_COMPLEXITY * MaximumThreadCount)) {
+		    TargetThreadCount = ptrdiff_t(Complexity / double(MLAS_SGEMM_THREAD_COMPLEXITY)) + 1;
+	    } else {
+		    TargetThreadCount = MaximumThreadCount;
+	    }
+    }
+#endif
+
     //
     // Segment the operation across multiple threads.
     //
