@@ -63,11 +63,24 @@ MlasSgemmComputeBlockMMA(
 {
     MLAS_FLOAT32X4 BElements[4];
     typedef __vector unsigned char  vec_t;
-
+    BElements[0] = vec_xl(0, B);
+    BElements[1] = vec_xl(0, B+4);
+    BElements[2] = vec_xl(0, B+8);
+    BElements[3] = vec_xl(0, B+12);
+#if 0
+    __vector_pair B1, B2;
+    B1 = __builtin_vsx_lxvp(0, (__vector_pair*)B);
+    B2 = __builtin_vsx_lxvp(0, (__vector_pair*)(B+8));
+    __builtin_vsx_disassemble_pair(BElements, &B1);
+    __builtin_vsx_disassemble_pair(BElements+2, &B2);
+#endif
+#if 0   
     BElements[0] = MlasLoadFloat32x4(B);
     BElements[1] = MlasLoadFloat32x4(B + 4);
     BElements[2] = MlasLoadFloat32x4(B + 8);
     BElements[3] = MlasLoadFloat32x4(B + 12);
+#endif
+
    __builtin_mma_xvf32gerpp (&acc[0], reinterpret_cast<vec_t>(ABroadcast), reinterpret_cast<vec_t>(BElements[0]));
    __builtin_mma_xvf32gerpp (&acc[1], reinterpret_cast<vec_t>(ABroadcast), reinterpret_cast<vec_t>(BElements[1]));
    __builtin_mma_xvf32gerpp (&acc[2], reinterpret_cast<vec_t>(ABroadcast), reinterpret_cast<vec_t>(BElements[2]));
@@ -95,7 +108,7 @@ struct MlasSgemmStoreVectorMMA
         )
     {
         MLAS_FLOAT32X4 *rowC;
-        if (ZeroMode) {
+	if (ZeroMode) {
             rowC = reinterpret_cast<MLAS_FLOAT32X4 *>(&C[Row * ldc + VectorCount]);
             rowC[0] = Result[Row] * AlphaBroadcast;
         } else {
@@ -186,7 +199,7 @@ MlasSgemmMMAProcessCount(
         //
         // Compute the output block.
         //
-        while (k >= 4) {
+	while (k >= 4) {
 
             MlasLoopUnroll<RowCount, MlasFgemmLoadAElements>()(AElements, a, lda);
             MlasSgemmComputeAElements<RowCount>(AElements, ABroadcast);

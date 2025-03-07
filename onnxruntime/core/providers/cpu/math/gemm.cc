@@ -263,6 +263,11 @@ Status Gemm<float>::PrePack(const Tensor& tensor, int input_idx,
   // only pack Matrix B
   if (input_idx == 1) {
     size_t packed_b_size;
+#if 0
+#if defined(MLAS_TARGET_POWER)
+    trans_B_ = CblasNoTrans;
+#endif
+#endif
     is_packed = GemmPackBFp32(alloc, tensor, trans_B_ != CblasNoTrans, packed_b_, packed_b_size, b_shape_);
     bool share_prepacked_weights = (prepacked_weights != nullptr);
     if (is_packed && share_prepacked_weights) {

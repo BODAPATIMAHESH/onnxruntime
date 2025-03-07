@@ -16,7 +16,6 @@ Abstract:
 --*/
 
 #include "mlasi.h"
-
 //
 // Define the number of rows from matrix A to transpose to a local buffer.
 //
@@ -261,6 +260,17 @@ Return Value:
 
 #if defined(MLAS_NEON_INTRINSICS)
             vst4q_f32(D, vld4q_f32(b));
+#elif defined(MLAS_TARGET_POWER)
+	    __vector_pair C1, C2;
+	    __vector float c1[2] = {0},c2[2] = {0};
+	    C1=__builtin_vsx_lxvp(0, (__vector_pair*)&b[0]);
+	    C2=__builtin_vsx_lxvp(0, (__vector_pair*)&b[8]);
+            __builtin_vsx_disassemble_pair(c1, &C1);
+	    __builtin_vsx_disassemble_pair(c2, &C2);
+	    vec_xst(c1[0], 0, &D[0]);
+	    vec_xst(c1[1], 0, &D[4]);
+	    vec_xst(c1[2], 0, &D[8]);
+	    vec_xst(c1[3], 0, &D[12]);
 #else
             MLAS_FLOAT32X4 t0 = MlasLoadFloat32x4(&b[0]);
             MLAS_FLOAT32X4 t1 = MlasLoadFloat32x4(&b[4]);
@@ -472,6 +482,7 @@ Return Value:
         const float* b = B;
         size_t x = CountX;
 
+//#if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64) || defined(MLAS_TARGET_POWER)
 #if defined(MLAS_TARGET_AMD64) || defined(MLAS_TARGET_LARCH64)
 
         MLAS_SGEMM_TRANSPOSE_PACKB_BLOCK_ROUTINE* SgemmTransposePackB16x4Routine =
@@ -1537,9 +1548,7 @@ Return Value:
 
     const float* A = DataParams->A + RangeStartM * ((TransA == CblasNoTrans) ? lda : 1);
     float* C = DataParams->C + RangeStartM * ldc + RangeStartN;
-
     if (DataParams->BIsPacked) {
-
         MlasSgemmPackedOperation(TransA, RangeCountM, RangeStartN, RangeCountN,
             K, DataParams->alpha, A, lda, DataParams->B,
             BlockedN * MLAS_SGEMM_STRIDEN_THREAD_ALIGN, DataParams->beta, C, ldc);
@@ -1577,7 +1586,6 @@ MlasGemmBatch(
     // Compute the number of target threads given the complexity of the SGEMM
     // operation. Small requests should run using the single threaded path.
     //
-
     const double Complexity = double(M) * double(N) * double(K);
 
     ptrdiff_t TargetThreadCount = ptrdiff_t(Complexity / double(MLAS_SGEMM_THREAD_COMPLEXITY)) + 1;
@@ -1732,5 +1740,6 @@ Return Value:
         }
 
         PackedB = (float*)PackedB + AlignedN * CountK;
+
     }
 }

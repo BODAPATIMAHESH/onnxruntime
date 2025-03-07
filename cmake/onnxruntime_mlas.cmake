@@ -488,6 +488,7 @@ else()
             if (HAS_P10_RUNTIME)
               set_source_files_properties(${MLAS_SRC_DIR}/platform.cpp PROPERTIES COMPILE_FLAGS "-DPOWER10")
               set_source_files_properties(${MLAS_SRC_DIR}/qgemm.cpp PROPERTIES COMPILE_FLAGS "-DPOWER10")
+	      set_source_files_properties(${MLAS_SRC_DIR}/sgemm.cpp PROPERTIES COMPILE_FLAGS "-mcpu=power10")
             endif()
             set(mlas_platform_srcs_power10
               ${MLAS_SRC_DIR}/power/SgemmKernelPOWER10.cpp

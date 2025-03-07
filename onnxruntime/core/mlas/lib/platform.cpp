@@ -604,6 +604,7 @@ Return Value:
     this->QuantizeLinearU16Kernel = MlasQuantizeLinearU16Kernel;
     this->QuantizeLinearS4Kernel = MlasQuantizeLinearS4Kernel;
     this->QuantizeLinearU4Kernel = MlasQuantizeLinearU4Kernel;
+    this->TransposePackB16x4Routine = MlasSgemmTransposePackB16x4VSX;
 
 #if defined(__linux__)
     unsigned long hwcap2 = getauxval(AT_HWCAP2);
