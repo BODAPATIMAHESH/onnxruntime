@@ -16,6 +16,7 @@ Abstract:
 --*/
 
 #include "mlasi.h"
+//#include<stdio.h>
 
 //
 // Define the number of rows from matrix A to transpose to a local buffer.
@@ -1058,9 +1059,7 @@ Return Value:
 --*/
 {
     while (CountM > 0) {
-
-        size_t RowsHandled;
-
+    size_t RowsHandled;
 #if (defined(MLAS_TARGET_AMD64_IX86) || defined(MLAS_TARGET_POWER) || defined(MLAS_TARGET_LARCH64)) && !defined(FORCE_GENERIC_ALGORITHMS)
         RowsHandled = GetMlasPlatform().GemmFloatKernel(A, B, C, CountK, CountM, CountN, lda, ldc, alpha, ZeroMode);
 #else
@@ -1075,7 +1074,6 @@ Return Value:
         A += lda * RowsHandled;
         CountM -= RowsHandled;
     }
-
     return C;
 }
 
@@ -1381,6 +1379,16 @@ Return Value:
 --*/
 {
     float PanelA[MLAS_SGEMM_TRANSA_ROWS * MLAS_SGEMM_PACKED_STRIDEK];
+#if defined(MLAS_TARGET_POWER) && !defined(FORCE_GENERIC_ALGORITHMS)
+     	    if (M == 1 && alpha == 1.0f && (beta == 0.0f || beta == 1.0f)) {
+                  MLAS_SGEMM_KERNEL_M1_ROUTINE* SgemmKernelM1Routine;
+		  SgemmKernelM1Routine = GetMlasPlatform().KernelM1Routine;
+		  if (SgemmKernelM1Routine != nullptr) {
+		     SgemmKernelM1Routine(A, (const float*)PackedB, C, K, RangeCountN, (beta == 0.0f), ldc);
+		     return;
+		  }
+	    }
+#endif
 
     //
     // Step through each slice of matrix B along the N dimension.
@@ -1388,7 +1396,7 @@ Return Value:
 
     size_t CountN;
 
-    for (size_t n = 0; n < RangeCountN; n += CountN) {
+	for (size_t n = 0; n < RangeCountN; n += CountN) {
 
         const size_t SliceStartN = RangeStartN + n;
 
@@ -1421,11 +1429,8 @@ Return Value:
             float* c = C + n;
 
             if (TransA == CblasNoTrans) {
-
-                MlasSgemmKernelLoop(A + k, pb, c, CountK, M, CountN, lda, ldc, alpha, ZeroMode);
-
+	      MlasSgemmKernelLoop(A + k, pb, c, CountK, M, CountN, lda, ldc, alpha, ZeroMode);
             } else {
-
                 const float* a = A + k * lda;
                 size_t RowsRemaining = M;
 
@@ -1573,6 +1578,7 @@ MlasGemmBatch(
     )
 {
 
+
     //
     // Compute the number of target threads given the complexity of the SGEMM
     // operation. Small requests should run using the single threaded path.
@@ -1718,7 +1724,6 @@ Return Value:
     //
     // Step through each slice of matrix B along the K dimension.
     //
-
     size_t CountK;
 
     for (size_t k = 0; k < K; k += CountK) {

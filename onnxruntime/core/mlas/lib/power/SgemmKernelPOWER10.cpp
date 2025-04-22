@@ -146,6 +146,210 @@ struct MlasSgemmStoreScalarMMA
 template<size_t RowCount>
 MLAS_FORCEINLINE
 size_t
+MlasSgemmMMAProcessCount1M(
+    const float* A,
+    const float* B,
+    float* C,
+    size_t CountK,
+    size_t CountN,
+    size_t lda,
+    size_t ldc,
+    MLAS_FLOAT32X4 AlphaBroadcast,
+    bool ZeroMode
+    )
+{
+    do {
+
+        const float* a = A;
+        size_t k = CountK;
+        typedef __vector unsigned char  vec_t;
+        MLAS_FLOAT32X4 Accumulators[1][4] = {{ 0 }};
+        MLAS_FLOAT32X4 Result[1];
+	MLAS_FLOAT32X4 vec_A[4],BElements[4];
+	MLAS_FLOAT32X4 ABroadcast[1];
+        __vector_quad acc[4];
+
+        //
+        // Clear the block accumulators.
+        //
+        __builtin_mma_xxsetaccz(&acc[0]);
+        __builtin_mma_xxsetaccz(&acc[1]);
+        __builtin_mma_xxsetaccz(&acc[2]);
+        __builtin_mma_xxsetaccz(&acc[3]);
+
+        //
+        // Compute the output block.
+        //
+	while (k >= 4) {
+		vec_A[0] = vec_xl(0,a);
+		vec_A[1] = vec_splats(*((float*)&vec_A+1));
+		vec_A[2] = vec_splats(*((float*)&vec_A+2));
+		vec_A[3] = vec_splats(*((float*)&vec_A+3));
+		BElements[0] = MlasLoadFloat32x4(B);
+		BElements[1] = MlasLoadFloat32x4(B + 4);
+		BElements[2] = MlasLoadFloat32x4(B + 8);
+		BElements[3] = MlasLoadFloat32x4(B + 12);
+		__builtin_mma_xvf32gerpp (&acc[0], reinterpret_cast<vec_t>(vec_A[0]), reinterpret_cast<vec_t>(BElements[0]));
+		__builtin_mma_xvf32gerpp (&acc[1], reinterpret_cast<vec_t>(vec_A[0]), reinterpret_cast<vec_t>(BElements[1]));
+		__builtin_mma_xvf32gerpp (&acc[2], reinterpret_cast<vec_t>(vec_A[0]), reinterpret_cast<vec_t>(BElements[2]));
+		__builtin_mma_xvf32gerpp (&acc[3], reinterpret_cast<vec_t>(vec_A[0]), reinterpret_cast<vec_t>(BElements[3]));
+		BElements[0] = MlasLoadFloat32x4(B+16);
+		BElements[1] = MlasLoadFloat32x4(B + 20);
+		BElements[2] = MlasLoadFloat32x4(B + 24);
+		BElements[3] = MlasLoadFloat32x4(B + 28);
+		__builtin_mma_xvf32gerpp (&acc[0], reinterpret_cast<vec_t>(vec_A[1]), reinterpret_cast<vec_t>(BElements[0]));
+		__builtin_mma_xvf32gerpp (&acc[1], reinterpret_cast<vec_t>(vec_A[1]), reinterpret_cast<vec_t>(BElements[1]));
+		__builtin_mma_xvf32gerpp (&acc[2], reinterpret_cast<vec_t>(vec_A[1]), reinterpret_cast<vec_t>(BElements[2]));
+		__builtin_mma_xvf32gerpp (&acc[3], reinterpret_cast<vec_t>(vec_A[1]), reinterpret_cast<vec_t>(BElements[3]));
+		BElements[0] = MlasLoadFloat32x4(B+32);
+		BElements[1] = MlasLoadFloat32x4(B + 36);
+		BElements[2] = MlasLoadFloat32x4(B + 40);
+		BElements[3] = MlasLoadFloat32x4(B + 44);
+		__builtin_mma_xvf32gerpp (&acc[0], reinterpret_cast<vec_t>(vec_A[2]), reinterpret_cast<vec_t>(BElements[0]));
+		__builtin_mma_xvf32gerpp (&acc[1], reinterpret_cast<vec_t>(vec_A[2]), reinterpret_cast<vec_t>(BElements[1]));
+		__builtin_mma_xvf32gerpp (&acc[2], reinterpret_cast<vec_t>(vec_A[2]), reinterpret_cast<vec_t>(BElements[2]));
+		__builtin_mma_xvf32gerpp (&acc[3], reinterpret_cast<vec_t>(vec_A[2]), reinterpret_cast<vec_t>(BElements[3]));
+		BElements[0] = MlasLoadFloat32x4(B+48);
+		BElements[1] = MlasLoadFloat32x4(B + 52);
+		BElements[2] = MlasLoadFloat32x4(B + 56);
+		BElements[3] = MlasLoadFloat32x4(B + 60);
+		__builtin_mma_xvf32gerpp (&acc[0], reinterpret_cast<vec_t>(vec_A[3]), reinterpret_cast<vec_t>(BElements[0]));
+		__builtin_mma_xvf32gerpp (&acc[1], reinterpret_cast<vec_t>(vec_A[3]), reinterpret_cast<vec_t>(BElements[1]));
+		__builtin_mma_xvf32gerpp (&acc[2], reinterpret_cast<vec_t>(vec_A[3]), reinterpret_cast<vec_t>(BElements[2]));
+		__builtin_mma_xvf32gerpp (&acc[3], reinterpret_cast<vec_t>(vec_A[3]), reinterpret_cast<vec_t>(BElements[3]));
+		B += 16 * 4;
+		a += 4;
+		k -= 4;
+	}
+
+        while (k > 0) {
+		MlasLoopUnroll<RowCount, MlasFgemmBroadcastAElements>()(vec_A, a, lda);
+		BElements[0] = MlasLoadFloat32x4(B);
+		BElements[1] = MlasLoadFloat32x4(B + 4);
+		BElements[2] = MlasLoadFloat32x4(B + 8);
+		BElements[3] = MlasLoadFloat32x4(B + 12);
+		__builtin_mma_xvf32gerpp (&acc[0], reinterpret_cast<vec_t>(vec_A[0]), reinterpret_cast<vec_t>(BElements[0]));
+		__builtin_mma_xvf32gerpp (&acc[1], reinterpret_cast<vec_t>(vec_A[0]), reinterpret_cast<vec_t>(BElements[1]));
+		__builtin_mma_xvf32gerpp (&acc[2], reinterpret_cast<vec_t>(vec_A[0]), reinterpret_cast<vec_t>(BElements[2]));
+		__builtin_mma_xvf32gerpp (&acc[3], reinterpret_cast<vec_t>(vec_A[0]), reinterpret_cast<vec_t>(BElements[3]));
+		a += 1;
+		B += 16;
+		k -= 1;
+        }
+        if (CountN >= 16) {
+		//
+		// Store the entire output block.
+		//
+                __builtin_mma_disassemble_acc (Result, &acc[0]);
+	        if (ZeroMode)
+			*((MLAS_FLOAT32X4 *)(C)) =Result[0] * AlphaBroadcast;
+		else
+			*((MLAS_FLOAT32X4 *)(C)) +=Result[0] * AlphaBroadcast;
+		__builtin_mma_disassemble_acc (Result, &acc[1]);
+	        if (ZeroMode)
+			*((MLAS_FLOAT32X4 *)(C+4)) =Result[0] * AlphaBroadcast;
+		else
+			*((MLAS_FLOAT32X4 *)(C+4)) +=Result[0] * AlphaBroadcast;
+                __builtin_mma_disassemble_acc (Result, &acc[2]);
+	        if (ZeroMode)
+			*((MLAS_FLOAT32X4 *)(C+8)) =Result[0] * AlphaBroadcast;
+		else
+			*((MLAS_FLOAT32X4 *)(C+8)) +=Result[0] * AlphaBroadcast;
+		__builtin_mma_disassemble_acc (Result, &acc[3]);
+	        if (ZeroMode)
+			*((MLAS_FLOAT32X4 *)(C+12)) =Result[0] * AlphaBroadcast;
+		else
+			*((MLAS_FLOAT32X4 *)(C+12)) +=Result[0] * AlphaBroadcast;
+        } else {
+		//
+		// Store the partial output block.
+		//
+
+                if (CountN >= 12) {
+			__builtin_mma_disassemble_acc (Result, &acc[0]);
+		        if (ZeroMode)
+				*((MLAS_FLOAT32X4 *)(C)) =Result[0] * AlphaBroadcast;
+		        else
+				*((MLAS_FLOAT32X4 *)(C)) +=Result[0] * AlphaBroadcast;
+                        __builtin_mma_disassemble_acc (Result, &acc[1]);
+	                if (ZeroMode)
+				*((MLAS_FLOAT32X4 *)(C+4)) =Result[0] * AlphaBroadcast;
+		        else
+				*((MLAS_FLOAT32X4 *)(C+4)) +=Result[0] * AlphaBroadcast;
+			__builtin_mma_disassemble_acc (Result, &acc[2]);
+			if (ZeroMode)
+				*((MLAS_FLOAT32X4 *)(C+8)) =Result[0] * AlphaBroadcast;
+			else
+				*((MLAS_FLOAT32X4 *)(C+8)) +=Result[0] * AlphaBroadcast;
+                        if (CountN - 12 > 0) {
+				__builtin_mma_disassemble_acc (Accumulators[0], &acc[3]);
+			}
+		} else if (CountN >= 8) {
+			__builtin_mma_disassemble_acc (Result, &acc[0]);
+		        if (ZeroMode)
+				*((MLAS_FLOAT32X4 *)(C)) =Result[0] * AlphaBroadcast;
+			else
+				*((MLAS_FLOAT32X4 *)(C)) +=Result[0] * AlphaBroadcast;
+			__builtin_mma_disassemble_acc (Result, &acc[1]);
+			if (ZeroMode)
+				*((MLAS_FLOAT32X4 *)(C+4)) =Result[0] * AlphaBroadcast;
+			else
+				*((MLAS_FLOAT32X4 *)(C+4)) +=Result[0] * AlphaBroadcast;
+			if (CountN - 8 > 0) {
+				__builtin_mma_disassemble_acc (Accumulators[0], &acc[2]);
+			}
+		} else if (CountN >= 4) {
+			__builtin_mma_disassemble_acc (Result, &acc[0]);
+		if (ZeroMode)
+			*((MLAS_FLOAT32X4 *)(C)) =Result[0] * AlphaBroadcast;
+		else
+			*((MLAS_FLOAT32X4 *)(C)) +=Result[0] * AlphaBroadcast;
+                if (CountN - 4 > 0) {
+                    __builtin_mma_disassemble_acc (Accumulators[0], &acc[1]);
+                }
+		} else {
+			__builtin_mma_disassemble_acc (Accumulators[0], &acc[0]);
+		}
+
+                //
+                // Store the remaining unaligned columns.
+                //
+
+                C += (CountN & ~3);
+                CountN &= 3;
+
+                if (CountN > 0) {
+			MlasLoopUnroll<1, MlasSgemmMultiplyAlphaTrailingMMA>()(Accumulators[0], AlphaBroadcast);
+			if (ZeroMode)
+				C[0] = *((float*)&Accumulators);
+                        else
+				C[0] += *((float*)&Accumulators);
+			if (CountN >= 2) {
+				if (ZeroMode)
+					C[1] = *((float*)&Accumulators+1);
+				else
+					C[1] += *((float*)&Accumulators+1);
+			}
+			if (CountN >= 3) {
+				if (ZeroMode)
+					C[2] = *((float*)&Accumulators+2);
+				else
+					C[2] += *((float*)&Accumulators+2);
+			}
+		}
+		break;
+	}
+
+        C += 16;
+        CountN -= 16;
+    } while (CountN > 0);
+
+    return 1;
+}
+
+template<size_t RowCount>
+MLAS_FORCEINLINE
+size_t
 MlasSgemmMMAProcessCount(
     const float* A,
     const float* B,
@@ -405,7 +609,7 @@ Return Value:
     } else if (CountM >= 2) {
         RowsHandled = MlasSgemmProcessCount<2>(A, B, C, CountK, CountN, lda, ldc, AlphaBroadcast, ZeroMode);
     } else {
-        RowsHandled = MlasSgemmProcessCount<1>(A, B, C, CountK, CountN, lda, ldc, AlphaBroadcast, ZeroMode);
+	RowsHandled = MlasSgemmMMAProcessCount1M<1>(A, B, C, CountK, CountN, lda, ldc, AlphaBroadcast, ZeroMode);
     }
 
     return RowsHandled;

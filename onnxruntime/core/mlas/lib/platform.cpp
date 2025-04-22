@@ -627,6 +627,7 @@ Return Value:
 #endif // __linux__
     if (HasP10Instructions) {
         this->GemmFloatKernel = MlasSgemmKernelPOWER10;
+	this->KernelM1Routine = MlasSgemmKernelM1POWER10;
         this->GemmDoubleKernel = MlasDgemmKernelPOWER10;
         this->GemmU8X8Dispatch = &MlasGemm8X8DispatchPOWER10;
     }
