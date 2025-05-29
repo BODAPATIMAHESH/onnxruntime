@@ -323,6 +323,7 @@ Return Value:
     int32_t ZeroPointA = typename KernelType::OffsetAType(Data->ZeroPointA);
     int32_t ZeroPointB = typename KernelType::OffsetBType(*Data->ZeroPointB);
 
+/* TODo : try this for POWER10 */    
     //
     // Try to use a GEMV kernel if supported by this kernel type.
     //

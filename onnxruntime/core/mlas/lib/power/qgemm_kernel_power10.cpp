@@ -437,12 +437,30 @@ MlasGemmQuantCopyPackA8x8(
             Vtype a2 = vmask;
             Vtype a3 = vmask;
             Vtype a1 = *reinterpret_cast<const Vtype *>(&a[0]);
-            if (CountM == 3) {
-                a3 = *reinterpret_cast<const Vtype *>(&a[lda * 2]);
-            }
-            if (CountM >= 2) {
+	    if (CountM == 1) {
+		Vtype vzero = reinterpret_cast<Vtype>(vec_splats(0x0));
+		vec_t va1 = AIsSigned ? reinterpret_cast<vec_t>(a1) :
+			                reinterpret_cast<vec_t>(vec_sub(a1, vmask));
+		Vtype vx =reinterpret_cast<Vtype>(vec_mergee(reinterpret_cast<__vector int>(va1),
+				           reinterpret_cast<__vector int>(vzero)));
+		Vtype vx1 =reinterpret_cast<Vtype>(vec_mergeo(reinterpret_cast<__vector int>(va1),
+					    reinterpret_cast<__vector int>(vzero)));
+		Vtype vx4 = vec_xxpermdi(vx, vzero, 0);
+		Vtype vx5 = vec_xxpermdi(vx1, vzero, 0);
+		Vtype vx6 = vec_xxpermdi(vx, vzero, 3);
+		Vtype vx7 = vec_xxpermdi(vx1, vzero, 3);
+		*reinterpret_cast<vec_t *>(&D[0]) = (vec_t)vx4;
+		vsum = vec_sum4s((vec_t)vx4, vsum);
+		*reinterpret_cast<vec_t *>(&D[16]) = (vec_t)vx5;
+		vsum = vec_sum4s((vec_t)vx5, vsum);
+		*reinterpret_cast<vec_t *>(&D[32]) = (vec_t)vx6;
+	        vsum = vec_sum4s((vec_t)vx6, vsum);
+		*reinterpret_cast<vec_t *>(&D[48]) = (vec_t)vx7;
+		vsum = vec_sum4s((vec_t)vx7, vsum);
+	    }else {
                 a2 = *reinterpret_cast<const Vtype *>(&a[lda]);
-            }
+	        if (CountM == 3)
+                  a3 = *reinterpret_cast<const Vtype *>(&a[lda * 2]);
             Vtype vx =
               reinterpret_cast<Vtype>(vec_mergee(reinterpret_cast<__vector int>(a1),
                                reinterpret_cast<__vector int>(a2)));
@@ -476,6 +494,7 @@ MlasGemmQuantCopyPackA8x8(
                               reinterpret_cast<vec_t>(vec_sub(vx7, vmask));
             *reinterpret_cast<vec_t *>(&D[48]) = vx0;
             vsum = vec_sum4s(vx0, vsum);
+	    }
             D += 16 * 4;
             a += 16;
             y -= 16;
@@ -1106,10 +1125,69 @@ MlasGemmQuantKernel<MLAS_GEMM_QUANT_KERNEL_POWER10>(
         //
         // Compute the output block using POWER10 MMA builtins.
         //
-        while (k >= 16) {
+	while (k >= 32) {
+	    vec_t *va = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(a));
+            vec_t *vb1 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(b));
+            vec_t *vb2 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*16]));
+            vec_t *vb3 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*32]));
+            vec_t *vb4 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*48]));
+	    
+	    if (CountM >= 8) {
+                MlasQgemmComputeMMA<true, 16>(&acc0, &acc4, va, vb1);
+                MlasQgemmComputeMMA<true, 16>(&acc1, &acc5, va, vb2);
+                MlasQgemmComputeMMA<true, 16>(&acc2, &acc6, va, vb3);
+                MlasQgemmComputeMMA<true, 16>(&acc3, &acc7, va, vb4);
+		vec_t *va = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(a+128));
+		vec_t *vb1 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(b+64));
+            vec_t *vb2 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*16+64]));
+            vec_t *vb3 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*32+64]));
+            vec_t *vb4 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*48+64]));
+                MlasQgemmComputeMMA<true, 16>(&acc0, &acc4, va, vb1);
+                MlasQgemmComputeMMA<true, 16>(&acc1, &acc5, va, vb2);
+                MlasQgemmComputeMMA<true, 16>(&acc2, &acc6, va, vb3);
+                MlasQgemmComputeMMA<true, 16>(&acc3, &acc7, va, vb4);
+		a+=256;
+            }
+            else {
+                    MlasQgemmComputeMMA<false, 16>(&acc0, &acc4, va, vb1);
+                    MlasQgemmComputeMMA<false, 16>(&acc1, &acc5, va, vb2);
+                    MlasQgemmComputeMMA<false, 16>(&acc2, &acc6, va, vb3);
+                    MlasQgemmComputeMMA<false, 16>(&acc3, &acc7, va, vb4);
+		    vec_t *va = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(a+64));
+                vec_t *vb1 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(b+64));
+            vec_t *vb2 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*16+64]));
+            vec_t *vb3 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*32+64]));
+            vec_t *vb4 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*48+64]));
+                MlasQgemmComputeMMA<false, 16>(&acc0, &acc4, va, vb1);
+                MlasQgemmComputeMMA<false, 16>(&acc1, &acc5, va, vb2);
+                MlasQgemmComputeMMA<false, 16>(&acc2, &acc6, va, vb3);
+                MlasQgemmComputeMMA<false, 16>(&acc3, &acc7, va, vb4);
+                a+=128;
+            }
+	    b += 128;
+            k -= 32;
+        }
+
+	while (k >= 16) {
             vec_t *va = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(a));
-            vec_t *vb = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(b));
-            if (CountM >= 8) {
+            vec_t *vb1 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(b));
+	    vec_t *vb2 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*16]));
+	    vec_t *vb3 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*32]));
+	    vec_t *vb4 = const_cast<vec_t *>(reinterpret_cast<const vec_t *>(&b[k1*48]));
+	    if (CountM >= 8) {
+	        MlasQgemmComputeMMA<true, 16>(&acc0, &acc4, va, vb1);
+		MlasQgemmComputeMMA<true, 16>(&acc1, &acc5, va, vb2);
+		MlasQgemmComputeMMA<true, 16>(&acc2, &acc6, va, vb3);
+		MlasQgemmComputeMMA<true, 16>(&acc3, &acc7, va, vb4);
+	    }
+	    else {
+		    MlasQgemmComputeMMA<false, 16>(&acc0, &acc4, va, vb1);
+		    MlasQgemmComputeMMA<false, 16>(&acc1, &acc5, va, vb2);
+		    MlasQgemmComputeMMA<false, 16>(&acc2, &acc6, va, vb3);
+		    MlasQgemmComputeMMA<false, 16>(&acc3, &acc7, va, vb4);
+	    }
+#if 0
+	    if (CountM >= 8) {
                 MlasQgemmComputeMMA<true, 16>(&acc0, &acc4, va, vb);
             } else {
                 MlasQgemmComputeMMA<false, 16>(&acc0, &acc4, va, vb);
@@ -1132,7 +1210,8 @@ MlasGemmQuantKernel<MLAS_GEMM_QUANT_KERNEL_POWER10>(
             } else {
                 MlasQgemmComputeMMA<false, 16>(&acc3, &acc7, va, vb);
             }
-            b += 64;
+#endif
+	    b += 64;
             if (CountM >= 8) {
                 a += 128;
             } else {
