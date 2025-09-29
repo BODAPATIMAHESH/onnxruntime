@@ -28,7 +28,7 @@ struct MlasSgemmBroadcastAElementsMMA
         size_t lda
         )
     {
-        ABroadcast[0][Row] = A [Row * lda];
+        ABroadcast[0] = vec_insert(A[Row * lda], ABroadcast[0], Row);
     }
 };
 
@@ -143,32 +143,28 @@ struct MlasSgemmStoreScalarMMA
     }
 };
 
-template<size_t RowCount>
+template <size_t RowCount>
 MLAS_FORCEINLINE
-size_t
-MlasSgemmMMAProcessCount(
-    const float* A,
-    const float* B,
-    float* C,
-    size_t CountM,
-    size_t CountK,
-    size_t CountN,
-    size_t lda,
-    size_t ldc,
-    MLAS_FLOAT32X4 AlphaBroadcast,
-    bool ZeroMode
+    size_t
+    MlasSgemmMMAProcessCount(
+        float __vector* Pa,
+        const float* B,
+        float* C,
+        size_t CountM,
+        size_t CountK,
+        size_t CountN,
+        size_t ldc,
+        MLAS_FLOAT32X4 AlphaBroadcast,
+        bool ZeroMode
     )
 {
     do {
-
-        const float* a = A;
+        float __vector* pa1 = Pa;
         size_t k = CountK;
 
-        MLAS_FLOAT32X4 Accumulators[2][RowCount] = {{ 0 }};
+        MLAS_FLOAT32X4 Accumulators[2][RowCount] = {{0}};
         MLAS_FLOAT32X4 Result[RowCount];
-        MLAS_FLOAT32X4 AElements[RowCount];
-        MLAS_FLOAT32X4 ABroadcast[RowCount] = { 0 };
-        MLAS_FLOAT32X4 A2Broadcast[RowCount] = { 0 };
+        MLAS_FLOAT32X4 ABroadcast[RowCount] = {0};
         __vector_quad acc[8];
 
         //
@@ -187,29 +183,32 @@ MlasSgemmMMAProcessCount(
         // Compute the output block.
         //
         while (k >= 4) {
-
-            MlasLoopUnroll<RowCount, MlasFgemmLoadAElements>()(AElements, a, lda);
-            MlasSgemmComputeAElements<RowCount>(AElements, ABroadcast);
             if (CountM == 8) {
-                MlasLoopUnroll<RowCount, MlasFgemmLoadAElements>()(AElements, a + ( lda * 4), lda);
-                MlasSgemmComputeAElements<RowCount>(AElements, A2Broadcast);
+                MlasSgemmComputeBlockMMA<RowCount>(&acc[0], pa1[0], pa1[4], B, CountM);
+                MlasSgemmComputeBlockMMA<RowCount>(&acc[0], pa1[1], pa1[5], B + 16, CountM);
+                MlasSgemmComputeBlockMMA<RowCount>(&acc[0], pa1[2], pa1[6], B + 32, CountM);
+                MlasSgemmComputeBlockMMA<RowCount>(&acc[0], pa1[3], pa1[7], B + 48, CountM);
+                B += 16 * 4;
+                pa1 += 8;
+                k -= 4;
+            } else {
+                MlasSgemmComputeBlockMMA<RowCount>(&acc[0], pa1[0], ABroadcast[0], B, CountM);
+                MlasSgemmComputeBlockMMA<RowCount>(&acc[0], pa1[1], ABroadcast[1], B + 16, CountM);
+                MlasSgemmComputeBlockMMA<RowCount>(&acc[0], pa1[2], ABroadcast[2], B + 32, CountM);
+                MlasSgemmComputeBlockMMA<RowCount>(&acc[0], pa1[3], ABroadcast[3], B + 48, CountM);
+                B += 16 * 4;
+                pa1 += 4;
+                k -= 4;
             }
-            MlasSgemmComputeBlockMMA<RowCount>(&acc[0], ABroadcast[0], A2Broadcast[0], B, CountM);
-            MlasSgemmComputeBlockMMA<RowCount>(&acc[0], ABroadcast[1], A2Broadcast[1], B+16, CountM);
-            MlasSgemmComputeBlockMMA<RowCount>(&acc[0], ABroadcast[2], A2Broadcast[2], B+32, CountM);
-            MlasSgemmComputeBlockMMA<RowCount>(&acc[0], ABroadcast[3], A2Broadcast[3], B+48, CountM);
-            B += 16 * 4;
-            a += 4;
-            k -= 4;
         }
-
         while (k > 0) {
-            MlasLoopUnroll<RowCount, MlasSgemmBroadcastAElementsMMA>()(ABroadcast, a, lda);
-            if (CountM == 8)  {
-                MlasLoopUnroll<RowCount, MlasSgemmBroadcastAElementsMMA>()(A2Broadcast, a + (lda * 4), lda);
+            if (CountM == 8) {
+                MlasSgemmComputeBlockMMA<RowCount>(&acc[0], pa1[0], pa1[1], B, CountM);
+                pa1 += 2;
+            } else {
+                MlasSgemmComputeBlockMMA<RowCount>(&acc[0], pa1[0], ABroadcast[0], B, CountM);
+                pa1 += 1;
             }
-            MlasSgemmComputeBlockMMA<RowCount>(&acc[0], ABroadcast[0], A2Broadcast[0], B, CountM);
-            a += 1;
             B += 16;
             k -= 1;
         }
@@ -340,6 +339,62 @@ MlasSgemmMMAProcessCount(
     return CountM;
 }
 
+template <size_t RowCount>
+MLAS_FORCEINLINE void
+MlasSgemmPackA(
+    float __vector* D,
+    const float* A,
+    size_t lda,
+    size_t k
+)
+{
+    __vector float a1, a2;
+    const float* a = A;
+    MLAS_FLOAT32X4 AElements[RowCount] = {};
+    MLAS_FLOAT32X4 A2Elements[RowCount] = {};
+    while (k >= 4) {
+        MlasLoopUnroll<4, MlasFgemmLoadAElements>()(AElements, a, lda);
+        a1 = vec_mergee(AElements[0], AElements[1]);
+        a2 = vec_mergee(AElements[2], AElements[3]);
+        D[0] = vec_xxpermdi(a1, a2, 0);
+        D[2] = vec_xxpermdi(a1, a2, 3);
+        a1 = vec_mergeo(AElements[0], AElements[1]);
+        a2 = vec_mergeo(AElements[2], AElements[3]);
+        D[1] = vec_xxpermdi(a1, a2, 0);
+        D[3] = vec_xxpermdi(a1, a2, 3);
+        if (RowCount == 8) {
+            MlasLoopUnroll<4, MlasFgemmLoadAElements>()(A2Elements, a + (lda * 4), lda);
+            a1 = vec_mergee(A2Elements[0], A2Elements[1]);
+            a2 = vec_mergee(A2Elements[2], A2Elements[3]);
+            D[4] = vec_xxpermdi(a1, a2, 0);
+            D[6] = vec_xxpermdi(a1, a2, 3);
+            a1 = vec_mergeo(A2Elements[0], A2Elements[1]);
+            a2 = vec_mergeo(A2Elements[2], A2Elements[3]);
+            D[5] = vec_xxpermdi(a1, a2, 0);
+            D[7] = vec_xxpermdi(a1, a2, 3);
+            D += 8;
+        } else {
+            D += 4;
+        }
+        a += 4;
+        k -= 4;
+    }
+    /* When k is less than 4, copy a single element from each row. */
+    while (k > 0) {
+        MlasLoopUnroll<4, MlasSgemmBroadcastAElementsMMA>()(AElements, a, lda);
+        D[0] = AElements[0];
+        if (RowCount == 8) {
+            MlasLoopUnroll<4, MlasSgemmBroadcastAElementsMMA>()(A2Elements, a + (lda * 4), lda);
+            D[1] = A2Elements[0];
+            D += 2;
+        } else {
+            D += 1;
+        }
+        a += 1;
+        k -= 1;
+    }
+}
+
 size_t
 MLASCALL
 MlasSgemmKernelPOWER10(
@@ -396,12 +451,16 @@ Return Value:
 --*/
 {
     size_t RowsHandled;
+    size_t index = CountK * 2;
+    MLAS_FLOAT32X4 PackA[index] = {0};
     MLAS_FLOAT32X4 AlphaBroadcast = MlasBroadcastFloat32x4(alpha);
 
     if (CountM >= 8) {
-        RowsHandled = MlasSgemmMMAProcessCount<4>(A, B, C, 8 ,CountK, CountN, lda, ldc, AlphaBroadcast, ZeroMode);
+        MlasSgemmPackA<8>(PackA, A, lda, CountK);
+        RowsHandled = MlasSgemmMMAProcessCount<4>(PackA, B, C, 8, CountK, CountN, ldc, AlphaBroadcast, ZeroMode);
     } else if (CountM >= 4) {
-        RowsHandled = MlasSgemmMMAProcessCount<4>(A, B, C, 4, CountK, CountN, lda, ldc, AlphaBroadcast, ZeroMode);
+        MlasSgemmPackA<4>(PackA, A, lda, CountK);
+        RowsHandled = MlasSgemmMMAProcessCount<4>(PackA, B, C, 4, CountK, CountN, ldc, AlphaBroadcast, ZeroMode);
     } else if (CountM >= 2) {
         RowsHandled = MlasSgemmProcessCount<2>(A, B, C, CountK, CountN, lda, ldc, AlphaBroadcast, ZeroMode);
     } else {
