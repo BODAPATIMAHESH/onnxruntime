@@ -339,6 +339,119 @@ MLAS_FORCEINLINE
     return CountM;
 }
 
+template<size_t RowCount>
+MLAS_FORCEINLINE
+size_t
+MlasSgemmProcessCount_M1(
+    float __vector* Pa,
+    const float* B,
+    float* C,
+    size_t CountK,
+    size_t CountN,
+    size_t ldc,
+    MLAS_FLOAT32X4 AlphaBroadcast,
+    bool ZeroMode
+    )
+{
+    do {
+float __vector* pa1 = Pa;
+        //const float* a = A;
+        size_t k = CountK;
+
+        MLAS_FLOAT32X4 Accumulators[RowCount][4];
+
+        //
+        // Clear the block accumulators.
+        //
+
+        MlasLoopUnroll<RowCount, MlasFgemmZeroAccumulators>()(Accumulators);
+
+        //
+        // Compute the output block.
+        //
+
+        while (k >= 4) {
+
+
+            MlasFgemmComputeBlock<RowCount>(Accumulators, &pa1[0], B);
+
+            MlasFgemmComputeBlock<RowCount>(Accumulators, &pa1[1], B + 16);
+
+            MlasFgemmComputeBlock<RowCount>(Accumulators, &pa1[2], B + 32);
+
+            MlasFgemmComputeBlock<RowCount>(Accumulators, &pa1[3], B + 48);
+
+            pa1 += 4;
+            B += 16 * 4;
+            k -= 4;
+        }
+
+        while (k > 0) {
+
+           // MlasLoopUnroll<RowCount, MlasFgemmBroadcastAElements>()(ABroadcast, a, lda);
+            MlasFgemmComputeBlock<RowCount>(Accumulators, &pa1[0], B);
+
+            pa1 += 1;
+            B += 16;
+            k -= 1;
+        }
+
+        if (CountN >= 16) {
+
+            //
+            // Store the entire output block.
+            //
+
+            MlasLoopUnroll<RowCount, MlasFgemmStoreVector<4>>()(Accumulators, C, ldc, AlphaBroadcast, ZeroMode);
+
+        } else {
+
+            //
+            // Store the partial output block.
+            //
+
+            if (CountN >= 12) {
+                MlasLoopUnroll<RowCount, MlasFgemmStoreVector<3>>()(Accumulators, C, ldc, AlphaBroadcast, ZeroMode);
+            } else if (CountN >= 8) {
+                MlasLoopUnroll<RowCount, MlasFgemmStoreVector<2>>()(Accumulators, C, ldc, AlphaBroadcast, ZeroMode);
+            } else if (CountN >= 4) {
+                MlasLoopUnroll<RowCount, MlasFgemmStoreVector<1>>()(Accumulators, C, ldc, AlphaBroadcast, ZeroMode);
+            }
+
+            //
+            // Store the remaining unaligned columns.
+            //
+
+            C += (CountN & ~3);
+            CountN &= 3;
+
+            if (CountN > 0) {
+
+                MlasLoopUnroll<RowCount, MlasFgemmMultiplyAlphaTrailing>()(Accumulators, AlphaBroadcast);
+
+                MlasLoopUnroll<RowCount, MlasFgemmStoreScalar<0>>()(Accumulators, C, ldc, ZeroMode);
+
+                if (CountN >= 2) {
+                    MlasLoopUnroll<RowCount, MlasFgemmStoreScalar<1>>()(Accumulators, C, ldc, ZeroMode);
+                }
+
+                if (CountN >= 3) {
+                    MlasLoopUnroll<RowCount, MlasFgemmStoreScalar<2>>()(Accumulators, C, ldc, ZeroMode);
+                }
+            }
+
+            break;
+        }
+
+        C += 16;
+        CountN -= 16;
+
+    } while (CountN > 0);
+
+    return RowCount;
+}
+
+
 template <size_t RowCount>
 MLAS_FORCEINLINE void
 MlasSgemmPackA(
@@ -392,6 +505,34 @@ MlasSgemmPackA(
         }
         a += 1;
         k -= 1;
+    }
+}
+
+MLAS_FORCEINLINE void
+MlasSgemmPackA_M1(
+    float __vector* D,
+    const float* A,
+    size_t lda,
+    size_t k
+)
+{
+    __vector float a1, a2;
+    const float* a = A;
+    MLAS_FLOAT32X4 AElements[1] = {};
+    while (k >= 4) {
+        D[0] = vec_splats(a[0]);
+       D[1] = vec_splats(a[1]);
+       D[2] = vec_splats(a[2]);
+       D[3] = vec_splats(a[3]);
+               k -=4;
+               a +=4;
+               D +=4;
+    }
+    while (k > 0) {
+           D[0] = vec_splats(a[0]);
+           D +=1;
+           a +=1;
+           k -=1;
     }
 }
 
@@ -451,20 +592,28 @@ Return Value:
 --*/
 {
     size_t RowsHandled;
-    size_t index = CountK * 2;
-    MLAS_FLOAT32X4 PackA[index] = {0};
     MLAS_FLOAT32X4 AlphaBroadcast = MlasBroadcastFloat32x4(alpha);
 
-    if (CountM >= 8) {
+    if (CountM >=8) {
+    size_t index = CountK * 2;
+    MLAS_FLOAT32X4 PackA[index] = {0};
         MlasSgemmPackA<8>(PackA, A, lda, CountK);
         RowsHandled = MlasSgemmMMAProcessCount<4>(PackA, B, C, 8, CountK, CountN, ldc, AlphaBroadcast, ZeroMode);
     } else if (CountM >= 4) {
+	    size_t index = CountK;
+    MLAS_FLOAT32X4 PackA[index] = {0};
         MlasSgemmPackA<4>(PackA, A, lda, CountK);
         RowsHandled = MlasSgemmMMAProcessCount<4>(PackA, B, C, 4, CountK, CountN, ldc, AlphaBroadcast, ZeroMode);
     } else if (CountM >= 2) {
         RowsHandled = MlasSgemmProcessCount<2>(A, B, C, CountK, CountN, lda, ldc, AlphaBroadcast, ZeroMode);
     } else {
-        RowsHandled = MlasSgemmProcessCount<1>(A, B, C, CountK, CountN, lda, ldc, AlphaBroadcast, ZeroMode);
+	    RowsHandled = MlasSgemmProcessCount<1>(A, B, C, CountK, CountN, lda, ldc, AlphaBroadcast, ZeroMode);
+#if 0
+           size_t index = CountK;
+           MLAS_FLOAT32X4 PackA[index] = {0};
+        MlasSgemmPackA_M1(PackA, A, lda, CountK);
+        RowsHandled = MlasSgemmProcessCount_M1<1>(PackA, B, C, CountK, CountN, ldc, AlphaBroadcast, ZeroMode);
+#endif
     }
 
     return RowsHandled;
