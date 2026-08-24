@@ -691,6 +691,26 @@ else()
           set_source_files_properties(${MLAS_SRC_DIR}/power/QuantizePowerVSX.cpp PROPERTIES COMPILE_FLAGS "-mcpu=power9")
         endif()
 
+	# Check if compiler supports POWER12 target flag
+	check_cxx_compiler_flag("-mcpu=future" HAS_MCPU_FUTURE)
+	message(STATUS "HAS_MCPU_FUTURE=${HAS_MCPU_FUTURE}")
+	#if(HAS_MCPU_FUTURE)
+          message(STATUS "Compiler supports -mcpu=future, enabling POWER12 kernel")
+	  set(mlas_platform_srcs_power12
+      	    ${MLAS_SRC_DIR}/power/qgemm_kernel_power12.cpp
+          )
+	  set(mlas_platform_srcs
+	    ${mlas_platform_srcs}
+	    ${mlas_platform_srcs_power12}
+	  )
+	  set_source_files_properties(
+            ${MLAS_SRC_DIR}/power/qgemm_kernel_power12.cpp PROPERTIES COMPILE_FLAGS "-O0 -mcpu=future"
+	  )
+	  # Append macro safely
+	  set_property(SOURCE ${MLAS_SRC_DIR}/platform.cpp APPEND_STRING PROPERTY COMPILE_FLAGS " -DPOWER10 -DPOWER12")
+
+	  set_property(SOURCE ${MLAS_SRC_DIR}/qgemm.cpp APPEND_STRING PROPERTY COMPILE_FLAGS " -DPOWER10 -DPOWER12")
+	  #endif()
         check_cxx_compiler_flag("-mcpu=power10" HAS_POWER10)
         if(HAS_POWER10)
           set(CMAKE_REQUIRED_FLAGS "-mcpu=power10")
@@ -703,7 +723,7 @@ else()
             }"
             COMPILES_P10
           )
-          if(COMPILES_P10)
+	  if(HAS_POWER10)
             enable_language(ASM)
             check_cxx_source_compiles("
               #ifdef _AIX
@@ -729,9 +749,9 @@ else()
               #endif"
               HAS_P10_RUNTIME
             )
-            if (HAS_P10_RUNTIME)
-              set_source_files_properties(${MLAS_SRC_DIR}/platform.cpp PROPERTIES COMPILE_FLAGS "-DPOWER10")
-              set_source_files_properties(${MLAS_SRC_DIR}/qgemm.cpp PROPERTIES COMPILE_FLAGS "-DPOWER10")
+	    if (HAS_POWER10)
+	      set_source_files_properties(${MLAS_SRC_DIR}/platform.cpp PROPERTIES COMPILE_FLAGS "-DPOWER10 -DPOWER12")
+	      set_source_files_properties(${MLAS_SRC_DIR}/qgemm.cpp PROPERTIES COMPILE_FLAGS "-DPOWER10 -DPOWER12")
             endif()
             set(mlas_platform_srcs_power10
               ${MLAS_SRC_DIR}/power/SgemmKernelPOWER10.cpp

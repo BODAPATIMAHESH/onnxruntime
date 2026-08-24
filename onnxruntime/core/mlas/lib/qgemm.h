@@ -35,8 +35,6 @@ Abstract:
 #include <sstream>
 #include <string>
 #include <cstdlib>
-
-//
 // Define the default striding parameters used for the quantized integer
 // matrix/matrix multiply operation.
 //
@@ -898,10 +896,11 @@ MlasGemmQuantGetDispatch(
     if (!AIsSigned) {
         GemmQuantDispatch = &MlasGemmU8X8DispatchWasmSimd;
     }
+/* TO Do */
 #elif defined(MLAS_TARGET_POWER) && (defined(__linux__)  || defined(_AIX)) && defined(POWER10) && \
     ((defined(__GNUC__) && ((__GNUC__ > 10) || (__GNUC__== 10 && __GNUC_MINOR__ >= 2))) || \
     (defined(__clang__) && (__clang_major__ >= 12)))
-    if (GetMlasPlatform().GemmU8X8Dispatch == &MlasGemm8X8DispatchPOWER10) {
+    if (GetMlasPlatform().GemmU8X8Dispatch == &MlasGemm8X8DispatchPOWER12) {
         GemmQuantDispatch = GetMlasPlatform().GemmU8X8Dispatch;
     }
 #elif defined(MLAS_TARGET_LARCH64)
