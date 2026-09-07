@@ -98,7 +98,8 @@ Abstract:
 #if defined(_MSC_VER)
 #define MLAS_FORCEINLINE __forceinline
 #else
-#define MLAS_FORCEINLINE __attribute__ ((always_inline)) inline
+//#define MLAS_FORCEINLINE __attribute__ ((always_inline)) inline
+#define MLAS_FORCEINLINE inline
 #endif
 
 MLAS_FORCEINLINE
@@ -1492,6 +1493,7 @@ extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmU8X8DispatchWasmRelaxedSimd;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmQuantDispatchRvv;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemmQuantDispatchDefault;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemm8X8DispatchPOWER10;
+extern const MLAS_GEMM_QUANT_DISPATCH MlasGemm8X8DispatchPOWER12;
 extern const MLAS_GEMM_QUANT_DISPATCH MlasGemm8X8DispatchZVECTOR;
 
 #if defined(MLAS_TARGET_WASM_RELAXED_SIMD)

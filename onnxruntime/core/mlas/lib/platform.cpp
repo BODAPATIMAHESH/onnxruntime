@@ -840,6 +840,7 @@ Return Value:
         this->QuantizeLinearU8Kernel = MlasQuantizeLinearU8KernelVSX;
     }
 
+
 #if defined(POWER10)
 #if (defined(__GNUC__) && ((__GNUC__ > 10) || (__GNUC__== 10 && __GNUC_MINOR__ >= 2))) || \
     (defined(__clang__) && (__clang_major__ >= 12))
@@ -847,15 +848,41 @@ Return Value:
     bool HasP10Instructions = ((hwcap2 & PPC_FEATURE2_MMA) && (hwcap2 & PPC_FEATURE2_ARCH_3_1));
 #elif defined(_AIX)
     bool HasP10Instructions = (__power_10_andup() && __power_mma_version() == MMA_V31);
-#endif // __linux__
+#endif
     if (HasP10Instructions) {
         this->GemmFloatKernel = MlasSgemmKernelPOWER10;
         this->GemmDoubleKernel = MlasDgemmKernelPOWER10;
-        this->GemmU8X8Dispatch = &MlasGemm8X8DispatchPOWER10;
+        this->GemmU8X8Dispatch = &MlasGemm8X8DispatchPOWER10;  // Set POWER10 as baseline
     }
 #endif
 #endif
 
+#if defined(POWER12)
+#if (defined(__GNUC__) && ((__GNUC__ > 12) || (__GNUC__== 12 && __GNUC_MINOR__ >= 1))) || \
+    (defined(__clang__) && (__clang_major__ >= 15))
+#if defined(__linux__) || defined(__FreeBSD__)
+    // Check for POWER12 with MMA+ support
+    // Note: PPC_FEATURE2_ARCH_3_2 may not be defined yet, use fallback
+    #ifndef PPC_FEATURE2_ARCH_3_2
+    #define PPC_FEATURE2_ARCH_3_2 0x00100000
+    #endif
+    bool HasP12Instructions = ((hwcap2 & PPC_FEATURE2_MMA) && (hwcap2 & PPC_FEATURE2_ARCH_3_2));
+#elif defined(_AIX)
+    // For AIX, check for POWER12 architecture, this to be updated.
+    #ifndef MMA_V40
+    #define MMA_V40 0x40
+    #endif
+    bool HasP12Instructions = (__power_12_andup() && __power_mma_version() >= MMA_V40);
+#endif
+    // REMOVE THIS LINE IN PRODUCTION!
+    HasP12Instructions = 1;  // Only for testing on POWER10 machine
+    if (HasP12Instructions) {
+        // POWER12 has MMA+ with DMR1024 registers for 16x16 operations
+        // Override POWER10 dispatch with POWER12
+        this->GemmU8X8Dispatch = &MlasGemm8X8DispatchPOWER12;
+    }
+#endif
+#endif    
 #endif // MLAS_TARGET_POWER
 
 #if defined(MLAS_TARGET_S390X)
