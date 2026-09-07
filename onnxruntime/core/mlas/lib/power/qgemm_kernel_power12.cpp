@@ -131,9 +131,6 @@ MlasGemmQuantCopyPackA16x16(
     constexpr uint8_t Flip = (AIsSigned ? 0 : 0x80);
     Vtype vmask = reinterpret_cast<Vtype>(vec_splats(Flip));
     typedef __vector signed char vec_t;
-    size_t M = CountM;
-    size_t K = CountK;
-    MLAS_GEMM_QUANT_KERNEL_POWER12::PackedAType *D_start = D;
     // Process 16 rows at a time for MMA+ 16x16 blocks
     // Pack format: For each K/4 iteration, pack 16 rows x 4 columns
     while (CountM >= 8) {
@@ -493,14 +490,6 @@ MlasGemmQuantCopyPackB8x8(
 
     // Process 16 columns of matrix B in a loop.
     //
-    MLAS_GEMM_QUANT_KERNEL_POWER12::PackedBType *D_start = D;
-    size_t K = CountK;
-    size_t N = CountN;
-    size_t PackedK = ((CountK + 4 - 1) / 4) * 16;
-    size_t k2 = PackedK;
-    size_t k3 = PackedK * 2;
-    size_t k4 = PackedK * 3;
-
     while (CountN >= 16) {
         // Process columns in groups of 4: cols 0-3, 4-7, 8-11, 12-15
         for (size_t col_group = 0; col_group < 16; col_group += 4) {
